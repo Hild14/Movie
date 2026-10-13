@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #09090b;
+}
+::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+/* Smooth scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #09090b;
+  color: #fafafa;
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* Screen glow effect */
+.screen-glow {
+  background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%);
+  box-shadow: 0 0 60px rgba(255,255,255,0.08), 0 0 120px rgba(34,211,238,0.05);
+  border-radius: 0 0 50% 50% / 0 0 20px 20px;
+}
+
+/* Seat pulse animation */
+@keyframes seat-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34,211,238,0.4); }
+  50% { box-shadow: 0 0 0 4px rgba(34,211,238,0.1); }
+}
+.seat-selected {
+  animation: seat-pulse 2s ease-in-out infinite;
+}
+
+/* Banner gradient overlay */
+.banner-overlay {
+  background: linear-gradient(to top, #09090b 0%, rgba(9,9,11,0.8) 30%, rgba(9,9,11,0.4) 60%, transparent 100%);
+}
+
+/* Hide scrollbar for horizontal scroll */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
