@@ -4,11 +4,14 @@ import {
   ChevronLeft, ChevronRight, Film, X, Plus, Minus, CreditCard,
   Check, QrCode, Download, Home, Heart, Filter, Popcorn,
   ShoppingCart, Tag, ChevronDown, Menu, Sparkles, LogOut,
-  Mail, Lock, CheckCircle, AlertCircle, Info, ExternalLink
+  Mail, Lock, CheckCircle, AlertCircle, Info, ExternalLink,
+  Shield, ShieldCheck, ArrowRight
 } from 'lucide-react';
 import {
-  movies, cities, theaters, showtimes, snacks, seatPrices, paymentMethods
+  initialMovies, cities, theaters, generateShowtimes,
+  initialSnacks, initialSeatPrices, paymentMethods, initialUsers, INITIAL_USERS
 } from './data/mockData.js';
+import AdminDashboard from './AdminDashboard.jsx';
 
 // ============================================================
 // UTILITY HELPERS
@@ -41,7 +44,7 @@ const allFormats = ['Tất cả', '2D', '3D', 'IMAX'];
 const initialSampleBookings = [
   {
     bookingId: 'CV-DEMO-2026',
-    movie: movies[1], // Avengers
+    movie: initialMovies[1], // Avengers
     showtimeInfo: {
       theater: theaters[1],
       room: { id: 204, name: 'IMAX' },
@@ -60,7 +63,7 @@ const initialSampleBookings = [
   },
   {
     bookingId: 'CV-PAST-1092',
-    movie: movies[3], // Mai
+    movie: initialMovies[3], // Mai
     showtimeInfo: {
       theater: theaters[0],
       room: { id: 101, name: 'Rạp 1' },
@@ -115,9 +118,9 @@ function ToastContainer({ toasts, removeToast }) {
 }
 
 // ============================================================
-// AUTH MODAL (Login / Register)
+// AUTH MODAL (Login / Register / Admin shortcut)
 // ============================================================
-function AuthModal({ isOpen, onClose, onLoginSuccess, showToast }) {
+function AuthModal({ isOpen, onClose, onLoginSuccess, showToast, usersList, setUsersList }) {
   const [tab, setTab] = useState('login'); // 'login' | 'register'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -132,26 +135,88 @@ function AuthModal({ isOpen, onClose, onLoginSuccess, showToast }) {
       return;
     }
 
-    const displayName = tab === 'register' ? name : (email.split('@')[0] || 'Cinephile');
-    const user = {
-      name: displayName,
-      email: email,
-      avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(displayName)}`,
-    };
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
 
-    onLoginSuccess(user);
-    showToast(tab === 'login' ? `Đăng nhập thành công! Chào ${displayName}` : `Đăng ký thành công! Chào mừng ${displayName}`, 'success');
+    // REGISTER LOGIC
+    if (tab === 'register') {
+      const emailTaken = usersList?.some(u => u.email.toLowerCase() === cleanEmail);
+      if (emailTaken) {
+        showToast('Email này đã được sử dụng', 'error');
+        return;
+      }
+
+      const cleanName = name.trim();
+      const newUser = {
+        id: 'user_' + Date.now(),
+        name: cleanName,
+        email: cleanEmail,
+        password: cleanPassword,
+        role: 'user',
+        createdAt: '2026-10-13',
+        status: 'active',
+        ticketsCount: 0,
+        avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(cleanName)}`,
+      };
+
+      const updatedUsers = [...(usersList || []), newUser];
+      setUsersList(updatedUsers);
+      localStorage.setItem('cineverse_users', JSON.stringify(updatedUsers));
+      onLoginSuccess(newUser);
+      showToast(`Đăng ký thành công! Chào mừng ${cleanName}`, 'success');
+      onClose();
+      return;
+    }
+
+    // LOGIN LOGIC
+    const matchedUser = usersList?.find(
+      u => u.email.toLowerCase() === cleanEmail && u.password === cleanPassword
+    );
+
+    if (!matchedUser) {
+      const emailExists = usersList?.some(u => u.email.toLowerCase() === cleanEmail);
+      if (emailExists) {
+        showToast('Mật khẩu không chính xác', 'error');
+      } else {
+        showToast('Email hoặc mật khẩu không chính xác', 'error');
+      }
+      return;
+    }
+
+    if (matchedUser.status === 'locked') {
+      showToast('Tài khoản của bạn đã bị khóa bởi Quản trị viên', 'error');
+      return;
+    }
+
+    onLoginSuccess(matchedUser);
+    showToast(
+      matchedUser.role === 'admin'
+        ? 'Đăng nhập thành công với quyền Quản trị viên (Admin)!'
+        : `Đăng nhập thành công! Chào ${matchedUser.name}`,
+      'success'
+    );
     onClose();
   };
 
   const handleDemoLogin = () => {
-    const demoUser = {
-      name: 'Nguyễn Văn A',
-      email: 'nguyenvana@gmail.com',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
-    };
+    const demoUser = usersList?.find(u => u.email === 'nguyenvana@gmail.com') || INITIAL_USERS[1];
+    if (demoUser?.status === 'locked') {
+      showToast('Tài khoản của bạn đã bị khóa bởi Quản trị viên', 'error');
+      return;
+    }
     onLoginSuccess(demoUser);
-    showToast('Đăng nhập dùng thử thành công!', 'success');
+    showToast(`Đăng nhập dùng thử thành công! Chào ${demoUser.name}`, 'success');
+    onClose();
+  };
+
+  const handleAdminDemoLogin = () => {
+    const adminUser = usersList?.find(u => u.email === 'admin@cineverse.com') || INITIAL_USERS[0];
+    if (adminUser?.status === 'locked') {
+      showToast('Tài khoản Quản trị viên đã bị khóa!', 'error');
+      return;
+    }
+    onLoginSuccess(adminUser);
+    showToast('Đăng nhập Quản trị viên (Admin) thành công!', 'success');
     onClose();
   };
 
@@ -174,7 +239,16 @@ function AuthModal({ isOpen, onClose, onLoginSuccess, showToast }) {
             <Film className="w-6 h-6 text-white" />
           </div>
           <h2 className="text-xl font-bold text-white">Chào mừng đến CineVerse</h2>
-          <p className="text-xs text-zinc-400 mt-1">Đăng nhập để xem lịch sử vé và phim yêu thích</p>
+          <p className="text-xs text-zinc-400 mt-1">
+            Đăng nhập để đặt vé hoặc truy cập Trang quản trị
+          </p>
+        </div>
+
+        {/* Admin hint badge */}
+        <div className="mb-4 p-2.5 bg-zinc-800/80 border border-cinema-gold/30 rounded-xl text-center">
+          <p className="text-[11px] text-zinc-300">
+            👑 Tài khoản Admin: <span className="text-cinema-gold font-mono font-bold">admin@cineverse.com</span> / Mật khẩu: <span className="text-cinema-gold font-mono font-bold">admin</span>
+          </p>
         </div>
 
         {/* Tabs */}
@@ -221,7 +295,7 @@ function AuthModal({ isOpen, onClose, onLoginSuccess, showToast }) {
               <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
               <input
                 type="email"
-                placeholder="example@gmail.com"
+                placeholder="admin@cineverse.com hoặc email của bạn"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-zinc-800/70 border border-zinc-700 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-cinema-red transition-colors"
@@ -251,21 +325,32 @@ function AuthModal({ isOpen, onClose, onLoginSuccess, showToast }) {
           </button>
         </form>
 
-        <div className="relative my-5 text-center">
+        <div className="relative my-4 text-center">
           <div className="border-t border-zinc-700/80" />
           <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-cinema-card px-3 text-xs text-zinc-500">
-            hoặc
+            hoặc đăng nhập nhanh
           </span>
         </div>
 
-        <button
-          type="button"
-          onClick={handleDemoLogin}
-          className="w-full py-2.5 bg-zinc-800 hover:bg-zinc-700/80 border border-zinc-700 text-zinc-200 text-sm font-medium rounded-xl transition-all flex items-center justify-center gap-2 group"
-        >
-          <Sparkles className="w-4 h-4 text-cinema-gold group-hover:rotate-12 transition-transform" />
-          Đăng nhập dùng thử (Demo Account)
-        </button>
+        <div className="grid grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            onClick={handleAdminDemoLogin}
+            className="py-2.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-cinema-gold text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            Đăng nhập Admin
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDemoLogin}
+            className="py-2.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-1.5"
+          >
+            <Sparkles className="w-4 h-4 text-zinc-400" />
+            Khách (Demo)
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -298,7 +383,6 @@ function TrailerModal({ movie, onClose }) {
           </button>
         </div>
 
-        {/* Video Responsive Container */}
         <div className="relative aspect-video w-full bg-black">
           {movie.trailerUrl ? (
             <iframe
@@ -323,7 +407,7 @@ function TrailerModal({ movie, onClose }) {
 // MY BOOKINGS MODAL
 // ============================================================
 function MyBookingsModal({ isOpen, onClose, bookings, onViewTicketDetail, onBookNewMovie }) {
-  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'upcoming' | 'completed'
+  const [activeTab, setActiveTab] = useState('all');
 
   if (!isOpen) return null;
 
@@ -338,7 +422,6 @@ function MyBookingsModal({ isOpen, onClose, bookings, onViewTicketDetail, onBook
         className="relative bg-cinema-card border border-cinema-border rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal Header */}
         <div className="p-5 border-b border-cinema-border flex items-center justify-between shrink-0 bg-zinc-900/60">
           <div className="flex items-center gap-2.5">
             <Ticket className="w-6 h-6 text-cinema-red" />
@@ -355,7 +438,6 @@ function MyBookingsModal({ isOpen, onClose, bookings, onViewTicketDetail, onBook
           </button>
         </div>
 
-        {/* Filter Tabs */}
         <div className="flex px-5 pt-3 border-b border-zinc-800 gap-2 shrink-0 bg-zinc-900/30">
           {[
             { id: 'all', label: 'Tất cả' },
@@ -376,7 +458,6 @@ function MyBookingsModal({ isOpen, onClose, bookings, onViewTicketDetail, onBook
           ))}
         </div>
 
-        {/* Bookings List */}
         <div className="p-5 overflow-y-auto space-y-4 flex-1">
           {filteredBookings.length === 0 ? (
             <div className="text-center py-14">
@@ -401,27 +482,27 @@ function MyBookingsModal({ isOpen, onClose, bookings, onViewTicketDetail, onBook
               >
                 <div className="flex gap-3.5 items-center">
                   <img
-                    src={b.movie.poster}
-                    alt={b.movie.title}
+                    src={b.movie?.poster}
+                    alt={b.movie?.title}
                     className="w-16 h-24 object-cover rounded-lg border border-zinc-800 shrink-0 shadow-md"
                   />
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${
-                        b.status === 'upcoming'
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                        b.status === 'completed'
+                          ? 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                          : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                       }`}>
-                        {b.status === 'upcoming' ? 'Sắp chiếu' : 'Đã xem'}
+                        {b.status === 'completed' ? 'Đã xem' : 'Sắp chiếu'}
                       </span>
                       <span className="text-xs text-zinc-500 font-mono">#{b.bookingId}</span>
                     </div>
-                    <h4 className="font-bold text-white text-base line-clamp-1">{b.movie.title}</h4>
+                    <h4 className="font-bold text-white text-base line-clamp-1">{b.movie?.title}</h4>
                     <p className="text-xs text-zinc-400 mt-0.5">
-                      {b.showtimeInfo.theater.name} • {b.showtimeInfo.room.name}
+                      {b.showtimeInfo?.theater?.name} • {b.showtimeInfo?.room?.name}
                     </p>
                     <p className="text-xs text-cinema-gold font-medium mt-1">
-                      {getDateDisplay(b.showtimeInfo.date)} - {b.showtimeInfo.time} | Ghế: {b.selectedSeats.map(s => s.id).join(', ')}
+                      {getDateDisplay(b.showtimeInfo?.date)} - {b.showtimeInfo?.time} | Ghế: {b.selectedSeats?.map(s => s.id).join(', ')}
                     </p>
                   </div>
                 </div>
@@ -454,10 +535,10 @@ function MyBookingsModal({ isOpen, onClose, bookings, onViewTicketDetail, onBook
 // ============================================================
 // FAVORITES MODAL
 // ============================================================
-function FavoritesModal({ isOpen, onClose, favoriteIds, onBookMovie, onToggleFavorite }) {
+function FavoritesModal({ isOpen, onClose, favoriteIds, moviesList, onBookMovie, onToggleFavorite }) {
   if (!isOpen) return null;
 
-  const favoriteMovies = movies.filter((m) => favoriteIds.includes(m.id));
+  const favoriteMovies = moviesList.filter((m) => favoriteIds.includes(m.id));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={onClose}>
@@ -498,7 +579,7 @@ function FavoritesModal({ isOpen, onClose, favoriteIds, onBookMovie, onToggleFav
                   <img src={m.poster} alt={m.title} className="w-14 h-20 object-cover rounded-lg border border-zinc-800 shrink-0" />
                   <div className="min-w-0">
                     <h4 className="font-bold text-white text-sm truncate">{m.title}</h4>
-                    <p className="text-xs text-zinc-400 mt-0.5">{m.duration} phút • {m.genre.join(', ')}</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">{m.duration} phút • {Array.isArray(m.genre) ? m.genre.join(', ') : m.genre}</p>
                     <div className="flex items-center gap-1 text-xs text-cinema-gold mt-1">
                       <Star className="w-3.5 h-3.5 fill-cinema-gold" />
                       <span>{m.rating}/10</span>
@@ -535,16 +616,18 @@ function FavoritesModal({ isOpen, onClose, favoriteIds, onBookMovie, onToggleFav
 }
 
 // ============================================================
-// HEADER COMPONENT
+// HEADER COMPONENT (With Role switch & Admin Navigation)
 // ============================================================
 function Header({
   searchQuery, setSearchQuery, selectedCity, setSelectedCity, onLogoClick,
   currentUser, onOpenAuth, onLogout, onOpenBookings, onOpenFavorites,
-  favoriteCount, bookingCount
+  favoriteCount, bookingCount, onNavigateAdmin
 }) {
   const [showCityDropdown, setShowCityDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const isAdmin = currentUser?.role === 'admin';
 
   return (
     <header className="sticky top-0 z-40 bg-cinema-darker/90 backdrop-blur-xl border-b border-cinema-border">
@@ -562,7 +645,7 @@ function Header({
         </button>
 
         {/* Search Bar - Desktop */}
-        <div className="hidden md:flex flex-1 max-w-md relative">
+        <div className="hidden md:flex flex-1 max-w-sm relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
           <input
             type="text"
@@ -581,8 +664,19 @@ function Header({
           )}
         </div>
 
-        {/* City Selector, Favorites shortcut & Auth */}
+        {/* City Selector, Favorites shortcut, Admin Link & Auth */}
         <div className="flex items-center gap-2.5">
+          {/* Admin Navigation Button (Visible if user is Admin) */}
+          {isAdmin && (
+            <button
+              onClick={onNavigateAdmin}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-amber-500/20 to-cinema-red/20 border border-cinema-gold/40 text-cinema-gold hover:border-cinema-gold rounded-full text-xs sm:text-sm font-bold transition-all shadow-lg shadow-amber-500/10 hover:scale-105"
+            >
+              <ShieldCheck className="w-4 h-4 text-cinema-gold" />
+              <span>Trang quản trị</span>
+            </button>
+          )}
+
           {/* City Dropdown */}
           <div className="relative">
             <button
@@ -644,11 +738,31 @@ function Header({
 
               {/* Profile Dropdown */}
               {showUserDropdown && (
-                <div className="absolute right-0 top-full mt-2 w-52 bg-zinc-800 border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in py-1">
+                <div className="absolute right-0 top-full mt-2 w-56 bg-zinc-800 border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in py-1">
                   <div className="px-4 py-3 border-b border-zinc-700/60">
-                    <p className="text-xs font-semibold text-white truncate">{currentUser.name}</p>
+                    <p className="text-xs font-semibold text-white truncate flex items-center gap-1.5">
+                      {currentUser.name}
+                      {isAdmin && (
+                        <span className="px-1.5 py-0.2 bg-amber-500/20 text-cinema-gold text-[10px] font-bold rounded">
+                          Admin
+                        </span>
+                      )}
+                    </p>
                     <p className="text-[11px] text-zinc-400 truncate">{currentUser.email}</p>
                   </div>
+
+                  {isAdmin && (
+                    <button
+                      onClick={() => {
+                        setShowUserDropdown(false);
+                        onNavigateAdmin();
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-cinema-gold hover:bg-zinc-700 flex items-center gap-2.5 transition-colors font-bold"
+                    >
+                      <ShieldCheck className="w-4 h-4 text-cinema-gold" />
+                      Vào Trang Quản trị
+                    </button>
+                  )}
 
                   <button
                     onClick={() => {
@@ -717,9 +831,9 @@ function Header({
         </div>
       </div>
 
-      {/* Mobile Search */}
+      {/* Mobile Search & Navigation */}
       {mobileMenuOpen && (
-        <div className="md:hidden px-4 pb-3 border-t border-zinc-800">
+        <div className="md:hidden px-4 pb-3 border-t border-zinc-800 space-y-2">
           <div className="relative mt-3">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
             <input
@@ -730,6 +844,22 @@ function Header({
               className="w-full pl-10 pr-4 py-2 bg-zinc-800/80 border border-zinc-700 rounded-full text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-cinema-red transition-all"
             />
           </div>
+
+          {isAdmin && (
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                onNavigateAdmin();
+              }}
+              className="w-full py-2.5 px-3 bg-amber-500/15 border border-amber-500/40 rounded-xl text-xs font-bold text-cinema-gold flex items-center justify-between transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4" />
+                Truy cập Trang Quản trị
+              </span>
+              <span>&rarr;</span>
+            </button>
+          )}
         </div>
       )}
     </header>
@@ -739,23 +869,27 @@ function Header({
 // ============================================================
 // HERO BANNER COMPONENT
 // ============================================================
-function HeroBanner({ onBookNow, onViewDetail, onPlayTrailer, isFavorite, onToggleFavorite }) {
+function HeroBanner({ moviesList, onBookNow, onViewDetail, onPlayTrailer, isFavorite, onToggleFavorite }) {
   const [currentSlide, setCurrentSlide] = useState(0);
-  const featuredMovies = movies.filter(m => m.isNowShowing).slice(0, 3);
+  const featuredMovies = useMemo(() => {
+    const active = moviesList.filter(m => m.isNowShowing);
+    return active.length > 0 ? active.slice(0, 3) : moviesList.slice(0, 3);
+  }, [moviesList]);
 
   useEffect(() => {
+    if (featuredMovies.length <= 1) return;
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % featuredMovies.length);
     }, 6000);
     return () => clearInterval(timer);
   }, [featuredMovies.length]);
 
-  const movie = featuredMovies[currentSlide];
+  if (!featuredMovies.length) return null;
+  const movie = featuredMovies[currentSlide] || featuredMovies[0];
   const favorited = isFavorite(movie.id);
 
   return (
     <div className="relative w-full h-[430px] md:h-[520px] overflow-hidden">
-      {/* Background Image */}
       <div className="absolute inset-0 transition-all duration-700">
         <img
           src={movie.banner}
@@ -765,7 +899,6 @@ function HeroBanner({ onBookNow, onViewDetail, onPlayTrailer, isFavorite, onTogg
         <div className="banner-overlay absolute inset-0" />
       </div>
 
-      {/* Content */}
       <div className="relative z-10 h-full max-w-7xl mx-auto px-4 flex flex-col justify-end pb-12">
         <div className="flex items-center gap-2 mb-3">
           <span className={`px-2.5 py-0.5 text-xs font-bold rounded ${
@@ -776,7 +909,7 @@ function HeroBanner({ onBookNow, onViewDetail, onPlayTrailer, isFavorite, onTogg
           }`}>
             {movie.ageRating}
           </span>
-          {movie.format.map(f => (
+          {(Array.isArray(movie.format) ? movie.format : ['2D']).map(f => (
             <span key={f} className="px-2 py-0.5 text-xs font-medium bg-zinc-800/70 text-zinc-300 rounded border border-zinc-700">
               {f}
             </span>
@@ -797,7 +930,7 @@ function HeroBanner({ onBookNow, onViewDetail, onPlayTrailer, isFavorite, onTogg
             {movie.duration} phút
           </span>
           <span>•</span>
-          <span className="truncate max-w-xs">{movie.genre.join(', ')}</span>
+          <span className="truncate max-w-xs">{Array.isArray(movie.genre) ? movie.genre.join(', ') : movie.genre}</span>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -829,32 +962,19 @@ function HeroBanner({ onBookNow, onViewDetail, onPlayTrailer, isFavorite, onTogg
         </div>
       </div>
 
-      {/* Slide Indicators */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-        {featuredMovies.map((_, idx) => (
-          <button
-            key={idx}
-            onClick={() => setCurrentSlide(idx)}
-            className={`h-1.5 rounded-full transition-all duration-300 ${
-              idx === currentSlide ? 'w-8 bg-cinema-red' : 'w-3 bg-zinc-500/70 hover:bg-zinc-400'
-            }`}
-          />
-        ))}
-      </div>
-
-      {/* Nav Arrows */}
-      <button
-        onClick={() => setCurrentSlide((currentSlide - 1 + featuredMovies.length) % featuredMovies.length)}
-        className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-2.5 bg-black/40 backdrop-blur-sm rounded-full text-white/80 hover:text-white hover:bg-black/60 transition-all hidden md:block"
-      >
-        <ChevronLeft className="w-6 h-6" />
-      </button>
-      <button
-        onClick={() => setCurrentSlide((currentSlide + 1) % featuredMovies.length)}
-        className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-2.5 bg-black/40 backdrop-blur-sm rounded-full text-white/80 hover:text-white hover:bg-black/60 transition-all hidden md:block"
-      >
-        <ChevronRight className="w-6 h-6" />
-      </button>
+      {featuredMovies.length > 1 && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+          {featuredMovies.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => setCurrentSlide(idx)}
+              className={`h-1.5 rounded-full transition-all duration-300 ${
+                idx === currentSlide ? 'w-8 bg-cinema-red' : 'w-3 bg-zinc-500/70 hover:bg-zinc-400'
+              }`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -867,7 +987,6 @@ function MovieCard({ movie, onBook, onViewDetail, onPlayTrailer, isFavorite, onT
 
   return (
     <div className="group bg-cinema-card rounded-2xl overflow-hidden border border-cinema-border hover:border-cinema-red/50 transition-all duration-300 hover:shadow-xl hover:shadow-cinema-red/10 hover:-translate-y-1 flex flex-col">
-      {/* Poster */}
       <div className="relative aspect-[2/3] overflow-hidden cursor-pointer" onClick={() => onViewDetail(movie)}>
         <img
           src={movie.poster}
@@ -876,7 +995,6 @@ function MovieCard({ movie, onBook, onViewDetail, onPlayTrailer, isFavorite, onT
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-        {/* Age Rating Badge */}
         <span className={`absolute top-2.5 left-2.5 px-2 py-0.5 text-[11px] font-bold rounded ${
           movie.ageRating === 'P' ? 'bg-green-500 text-white' :
           movie.ageRating === 'C13' ? 'bg-yellow-500 text-black' :
@@ -886,7 +1004,6 @@ function MovieCard({ movie, onBook, onViewDetail, onPlayTrailer, isFavorite, onT
           {movie.ageRating}
         </span>
 
-        {/* Favorite Heart Button */}
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -902,13 +1019,11 @@ function MovieCard({ movie, onBook, onViewDetail, onPlayTrailer, isFavorite, onT
           <Heart className={`w-3.5 h-3.5 ${favorited ? 'fill-current' : ''}`} />
         </button>
 
-        {/* Rating */}
         <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1 bg-black/70 backdrop-blur-md px-2 py-0.5 rounded-lg">
           <Star className="w-3 h-3 text-cinema-gold fill-cinema-gold" />
           <span className="text-xs font-bold text-white">{movie.rating}</span>
         </div>
 
-        {/* Play Trailer overlay icon */}
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -921,7 +1036,6 @@ function MovieCard({ movie, onBook, onViewDetail, onPlayTrailer, isFavorite, onT
         </button>
       </div>
 
-      {/* Info */}
       <div className="p-3.5 flex flex-col flex-1 justify-between">
         <div>
           <h3
@@ -936,10 +1050,10 @@ function MovieCard({ movie, onBook, onViewDetail, onPlayTrailer, isFavorite, onT
               {movie.duration}p
             </span>
             <span>•</span>
-            <span className="truncate">{movie.genre.join(', ')}</span>
+            <span className="truncate">{Array.isArray(movie.genre) ? movie.genre.join(', ') : movie.genre}</span>
           </div>
           <div className="flex gap-1 mb-3">
-            {movie.format.map(f => (
+            {(Array.isArray(movie.format) ? movie.format : ['2D']).map(f => (
               <span key={f} className="px-1.5 py-0.5 text-[10px] font-medium bg-zinc-800 text-zinc-400 rounded border border-zinc-700">
                 {f}
               </span>
@@ -972,7 +1086,6 @@ function MovieDetailModal({ movie, onClose, onBook, onPlayTrailer, isFavorite, o
         className="relative bg-cinema-card border border-cinema-border rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Banner */}
         <div className="relative h-48 md:h-64">
           <img src={movie.banner} alt={movie.title} className="w-full h-full object-cover rounded-t-2xl" />
           <div className="banner-overlay absolute inset-0 rounded-t-2xl" />
@@ -991,7 +1104,6 @@ function MovieDetailModal({ movie, onClose, onBook, onPlayTrailer, isFavorite, o
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-6 -mt-16 relative">
           <div className="flex gap-4">
             <img src={movie.poster} alt={movie.title} className="w-24 h-36 object-cover rounded-xl shadow-xl border-2 border-cinema-border shrink-0" />
@@ -1022,7 +1134,7 @@ function MovieDetailModal({ movie, onClose, onBook, onPlayTrailer, isFavorite, o
           <div className="mt-4 space-y-3">
             <div>
               <span className="text-xs text-zinc-500 uppercase tracking-wider font-semibold">Thể loại</span>
-              <p className="text-sm text-zinc-300">{movie.genre.join(', ')}</p>
+              <p className="text-sm text-zinc-300">{Array.isArray(movie.genre) ? movie.genre.join(', ') : movie.genre}</p>
             </div>
             <div>
               <span className="text-xs text-zinc-500 uppercase tracking-wider font-semibold">Đạo diễn</span>
@@ -1030,7 +1142,7 @@ function MovieDetailModal({ movie, onClose, onBook, onPlayTrailer, isFavorite, o
             </div>
             <div>
               <span className="text-xs text-zinc-500 uppercase tracking-wider font-semibold">Diễn viên</span>
-              <p className="text-sm text-zinc-300">{movie.cast.join(', ')}</p>
+              <p className="text-sm text-zinc-300">{Array.isArray(movie.cast) ? movie.cast.join(', ') : movie.cast}</p>
             </div>
             <div>
               <span className="text-xs text-zinc-500 uppercase tracking-wider font-semibold">Nội dung</span>
@@ -1039,7 +1151,7 @@ function MovieDetailModal({ movie, onClose, onBook, onPlayTrailer, isFavorite, o
             <div>
               <span className="text-xs text-zinc-500 uppercase tracking-wider font-semibold">Định dạng</span>
               <div className="flex gap-2 mt-1">
-                {movie.format.map(f => (
+                {(Array.isArray(movie.format) ? movie.format : ['2D']).map(f => (
                   <span key={f} className="px-3 py-1 text-xs bg-zinc-800 text-zinc-300 rounded-full border border-zinc-700">{f}</span>
                 ))}
               </div>
@@ -1075,9 +1187,9 @@ function MovieDetailModal({ movie, onClose, onBook, onPlayTrailer, isFavorite, o
 // ============================================================
 // SHOWTIME SELECTION COMPONENT
 // ============================================================
-function ShowtimeSelection({ movie, selectedCity, onSelectShowtime, onBack }) {
-  const availableDates = Object.keys(showtimes);
-  const [selectedDate, setSelectedDate] = useState(availableDates[0]);
+function ShowtimeSelection({ movie, selectedCity, showtimesData, onSelectShowtime, onBack }) {
+  const availableDates = Object.keys(showtimesData);
+  const [selectedDate, setSelectedDate] = useState(availableDates[0] || '2026-10-12');
   const cityTheaters = theaters.filter(t => t.city === selectedCity);
 
   return (
@@ -1100,7 +1212,7 @@ function ShowtimeSelection({ movie, selectedCity, onSelectShowtime, onBack }) {
             }`}>{movie.ageRating}</span>
             <span>{movie.duration} phút</span>
             <span>•</span>
-            <span>{movie.genre.join(', ')}</span>
+            <span>{Array.isArray(movie.genre) ? movie.genre.join(', ') : movie.genre}</span>
           </div>
           <p className="text-xs text-zinc-500 mt-2">
             Đạo diễn: {movie.director}
@@ -1108,7 +1220,6 @@ function ShowtimeSelection({ movie, selectedCity, onSelectShowtime, onBack }) {
         </div>
       </div>
 
-      {/* Date Selection */}
       <div className="mb-6">
         <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3 flex items-center gap-2">
           <Calendar className="w-4 h-4 text-cinema-red" />
@@ -1132,7 +1243,6 @@ function ShowtimeSelection({ movie, selectedCity, onSelectShowtime, onBack }) {
         </div>
       </div>
 
-      {/* Theater & Showtime */}
       <div>
         <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3 flex items-center gap-2">
           <Film className="w-4 h-4 text-cinema-gold" />
@@ -1154,7 +1264,7 @@ function ShowtimeSelection({ movie, selectedCity, onSelectShowtime, onBack }) {
                 </div>
                 <p className="text-xs text-zinc-500 mb-3.5">{theater.rooms.map(r => r.name).join(' • ')}</p>
                 <div className="flex flex-wrap gap-2.5">
-                  {(showtimes[selectedDate] || []).map((time) => (
+                  {(showtimesData[selectedDate] || []).map((time) => (
                     <button
                       key={time}
                       onClick={() => onSelectShowtime({
@@ -1181,7 +1291,7 @@ function ShowtimeSelection({ movie, selectedCity, onSelectShowtime, onBack }) {
 // ============================================================
 // SEAT SELECTION COMPONENT
 // ============================================================
-function SeatSelection({ movie, showtimeInfo, onConfirmSeats, onBack }) {
+function SeatSelection({ movie, showtimeInfo, seatPricesData, onConfirmSeats, onBack }) {
   const [selectedSeats, setSelectedSeats] = useState([]);
 
   const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
@@ -1189,7 +1299,7 @@ function SeatSelection({ movie, showtimeInfo, onConfirmSeats, onBack }) {
 
   const reservedSeats = useMemo(() => {
     const reserved = new Set();
-    const seed = movie.id * 17;
+    const seed = (movie.id || 1) * 17;
     for (let i = 0; i < 20; i++) {
       const r = rows[(seed + i * 7) % rows.length];
       const c = ((seed + i * 13) % 12) + 1;
@@ -1204,7 +1314,7 @@ function SeatSelection({ movie, showtimeInfo, onConfirmSeats, onBack }) {
     return 'standard';
   };
 
-  const getSeatPrice = (row) => seatPrices[getSeatType(row)];
+  const getSeatPrice = (row) => seatPricesData[getSeatType(row)] || 90000;
 
   const toggleSeat = (seatId, row) => {
     if (reservedSeats.has(seatId)) return;
@@ -1231,7 +1341,6 @@ function SeatSelection({ movie, showtimeInfo, onConfirmSeats, onBack }) {
         </p>
       </div>
 
-      {/* Screen */}
       <div className="mx-auto max-w-lg my-8">
         <div className="screen-glow h-9 flex items-center justify-center text-xs text-zinc-300 font-bold tracking-[0.3em] uppercase">
           MÀN HÌNH CHIẾU
@@ -1239,7 +1348,6 @@ function SeatSelection({ movie, showtimeInfo, onConfirmSeats, onBack }) {
         <div className="h-6 bg-gradient-to-b from-white/10 to-transparent" />
       </div>
 
-      {/* Seat Matrix */}
       <div className="overflow-x-auto no-scrollbar py-2">
         <div className="min-w-[520px] max-w-lg mx-auto space-y-2">
           {rows.map((row) => {
@@ -1295,19 +1403,18 @@ function SeatSelection({ movie, showtimeInfo, onConfirmSeats, onBack }) {
         </div>
       </div>
 
-      {/* Legend */}
       <div className="flex flex-wrap justify-center gap-4 mt-8 text-xs text-zinc-400 bg-zinc-900/60 p-3.5 rounded-xl border border-zinc-800">
         <div className="flex items-center gap-1.5">
           <div className="w-4 h-4 rounded-t-md bg-zinc-800 border border-zinc-700" />
-          <span>Thường ({formatPrice(seatPrices.standard)})</span>
+          <span>Thường ({formatPrice(seatPricesData.standard)})</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-4 h-4 rounded-t-md bg-zinc-800 border border-cinema-gold/50" />
-          <span>VIP ({formatPrice(seatPrices.vip)})</span>
+          <span>VIP ({formatPrice(seatPricesData.vip)})</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-6 h-4 rounded-t-md bg-zinc-800 border border-pink-500/50" />
-          <span>Sweetbox ({formatPrice(seatPrices.sweetbox)})</span>
+          <span>Sweetbox ({formatPrice(seatPricesData.sweetbox)})</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-4 h-4 rounded-t-md bg-cinema-neon" />
@@ -1319,7 +1426,6 @@ function SeatSelection({ movie, showtimeInfo, onConfirmSeats, onBack }) {
         </div>
       </div>
 
-      {/* Bottom Sticky Action Bar */}
       {selectedSeats.length > 0 && (
         <div className="fixed bottom-0 left-0 right-0 bg-cinema-darker/95 backdrop-blur-xl border-t border-cinema-border p-4 z-40">
           <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
@@ -1345,8 +1451,8 @@ function SeatSelection({ movie, showtimeInfo, onConfirmSeats, onBack }) {
 // ============================================================
 // SNACK SELECTION COMPONENT
 // ============================================================
-function SnackSelection({ onConfirmSnacks, onBack, initialSnacks }) {
-  const [snackOrders, setSnackOrders] = useState(initialSnacks || {});
+function SnackSelection({ snacksList, onConfirmSnacks, onBack, initialSnacksOrder }) {
+  const [snackOrders, setSnackOrders] = useState(initialSnacksOrder || {});
 
   const updateQty = (snackId, delta) => {
     setSnackOrders((prev) => {
@@ -1361,7 +1467,7 @@ function SnackSelection({ onConfirmSnacks, onBack, initialSnacks }) {
   };
 
   const totalSnackPrice = Object.entries(snackOrders).reduce((sum, [id, qty]) => {
-    const snack = snacks.find(s => s.id === Number(id));
+    const snack = snacksList.find(s => s.id === Number(id));
     return sum + (snack ? snack.price * qty : 0);
   }, 0);
 
@@ -1379,7 +1485,7 @@ function SnackSelection({ onConfirmSnacks, onBack, initialSnacks }) {
       <p className="text-xs text-zinc-400 mb-6">Thêm bắp giòn thơm và nước ngọt mát lạnh xem phim cực đã!</p>
 
       <div className="space-y-3">
-        {snacks.map((snack) => {
+        {snacksList.map((snack) => {
           const qty = snackOrders[snack.id] || 0;
           return (
             <div key={snack.id} className="flex items-center gap-4 bg-cinema-card border border-cinema-border rounded-2xl p-4 hover:border-zinc-700 transition-colors">
@@ -1435,7 +1541,7 @@ function SnackSelection({ onConfirmSnacks, onBack, initialSnacks }) {
 // ============================================================
 // CHECKOUT COMPONENT
 // ============================================================
-function Checkout({ movie, showtimeInfo, selectedSeats, snackOrders, onPaymentSuccess, onBack, showToast }) {
+function Checkout({ movie, showtimeInfo, selectedSeats, snackOrders, snacksList, onPaymentSuccess, onBack, showToast }) {
   const [voucher, setVoucher] = useState('');
   const [voucherApplied, setVoucherApplied] = useState(false);
   const [voucherError, setVoucherError] = useState('');
@@ -1444,7 +1550,7 @@ function Checkout({ movie, showtimeInfo, selectedSeats, snackOrders, onPaymentSu
 
   const seatTotal = selectedSeats.reduce((sum, s) => sum + s.price, 0);
   const snackTotal = Object.entries(snackOrders).reduce((sum, [id, qty]) => {
-    const snack = snacks.find(s => s.id === Number(id));
+    const snack = snacksList.find(s => s.id === Number(id));
     return sum + (snack ? snack.price * qty : 0);
   }, 0);
 
@@ -1501,7 +1607,6 @@ function Checkout({ movie, showtimeInfo, selectedSeats, snackOrders, onPaymentSu
         Xác nhận & Thanh toán
       </h2>
 
-      {/* Summary Box */}
       <div className="bg-cinema-card border border-cinema-border rounded-2xl p-5 mb-4 shadow-xl">
         <h3 className="font-bold text-white mb-4 flex items-center gap-2 text-xs uppercase tracking-wider text-zinc-400">
           <Ticket className="w-4 h-4 text-cinema-red" />
@@ -1535,12 +1640,11 @@ function Checkout({ movie, showtimeInfo, selectedSeats, snackOrders, onPaymentSu
           </div>
         </div>
 
-        {/* Snacks summary */}
         {Object.keys(snackOrders).length > 0 && (
           <div className="border-t border-zinc-800 mt-3 pt-3">
             <h4 className="text-[11px] text-zinc-500 uppercase tracking-wider font-semibold mb-2">Bắp nước kèm theo</h4>
             {Object.entries(snackOrders).map(([id, qty]) => {
-              const snack = snacks.find(s => s.id === Number(id));
+              const snack = snacksList.find(s => s.id === Number(id));
               return snack ? (
                 <div key={id} className="flex justify-between text-xs mb-1.5">
                   <span className="text-zinc-300">{snack.image} {snack.name} x{qty}</span>
@@ -1556,7 +1660,6 @@ function Checkout({ movie, showtimeInfo, selectedSeats, snackOrders, onPaymentSu
         )}
       </div>
 
-      {/* Voucher Box */}
       <div className="bg-cinema-card border border-cinema-border rounded-2xl p-5 mb-4 shadow-xl">
         <h3 className="font-bold text-white mb-3 flex items-center gap-2 text-sm">
           <Tag className="w-4 h-4 text-cinema-gold" />
@@ -1587,7 +1690,6 @@ function Checkout({ movie, showtimeInfo, selectedSeats, snackOrders, onPaymentSu
         )}
       </div>
 
-      {/* Payment Selection */}
       <div className="bg-cinema-card border border-cinema-border rounded-2xl p-5 mb-4 shadow-xl">
         <h3 className="font-bold text-white mb-3 flex items-center gap-2 text-sm">
           <CreditCard className="w-4 h-4 text-cinema-red" />
@@ -1618,7 +1720,6 @@ function Checkout({ movie, showtimeInfo, selectedSeats, snackOrders, onPaymentSu
         </div>
       </div>
 
-      {/* Bottom Sticky Payment Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-cinema-darker/95 backdrop-blur-xl border-t border-cinema-border p-4 z-40">
         <div className="max-w-2xl mx-auto">
           {discount > 0 && (
@@ -1663,15 +1764,13 @@ function Checkout({ movie, showtimeInfo, selectedSeats, snackOrders, onPaymentSu
 // ============================================================
 // E-TICKET MODAL COMPONENT
 // ============================================================
-function ETicket({ booking, onGoHome, onClose }) {
+function ETicket({ booking, snacksList, onGoHome, onClose }) {
   if (!booking) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
       <div className="w-full max-w-md my-auto">
-        {/* Ticket Box */}
         <div className="bg-cinema-card border border-cinema-border rounded-3xl overflow-hidden shadow-2xl">
-          {/* Header */}
           <div className="bg-gradient-to-r from-cinema-red via-red-600 to-cinema-gold p-5 text-white">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -1682,27 +1781,26 @@ function ETicket({ booking, onGoHome, onClose }) {
                 Vé điện tử
               </span>
             </div>
-            <h3 className="text-xl font-black mt-3 leading-tight">{booking.movie.title}</h3>
-            <p className="text-xs text-white/80 mt-0.5">{booking.showtimeInfo.theater.name}</p>
+            <h3 className="text-xl font-black mt-3 leading-tight">{booking.movie?.title}</h3>
+            <p className="text-xs text-white/80 mt-0.5">{booking.showtimeInfo?.theater?.name}</p>
           </div>
 
-          {/* Details */}
           <div className="p-6 space-y-4">
             <div className="grid grid-cols-2 gap-4 text-xs">
               <div>
                 <p className="text-zinc-500 mb-0.5">Phòng chiếu</p>
-                <p className="text-white font-bold text-sm">{booking.showtimeInfo.room.name}</p>
+                <p className="text-white font-bold text-sm">{booking.showtimeInfo?.room?.name}</p>
               </div>
               <div>
                 <p className="text-zinc-500 mb-0.5">Suất chiếu</p>
                 <p className="text-white font-bold text-sm">
-                  {booking.showtimeInfo.time} ({getDateDisplay(booking.showtimeInfo.date)})
+                  {booking.showtimeInfo?.time} ({getDateDisplay(booking.showtimeInfo?.date)})
                 </p>
               </div>
               <div>
                 <p className="text-zinc-500 mb-0.5">Danh sách ghế</p>
                 <p className="text-cinema-gold font-black text-base">
-                  {booking.selectedSeats.map(s => s.id).join(', ')}
+                  {booking.selectedSeats?.map(s => s.id).join(', ')}
                 </p>
               </div>
               <div>
@@ -1711,13 +1809,12 @@ function ETicket({ booking, onGoHome, onClose }) {
               </div>
             </div>
 
-            {/* Snacks if any */}
             {booking.snackOrders && Object.keys(booking.snackOrders).length > 0 && (
               <div className="border-t border-zinc-800 pt-3">
                 <p className="text-zinc-500 text-[11px] mb-1 font-semibold uppercase">Bắp nước</p>
                 <div className="space-y-0.5">
                   {Object.entries(booking.snackOrders).map(([id, qty]) => {
-                    const snack = snacks.find(s => s.id === Number(id));
+                    const snack = snacksList?.find(s => s.id === Number(id));
                     return snack ? (
                       <p key={id} className="text-xs text-zinc-300">
                         {snack.image} {snack.name} x{qty}
@@ -1728,14 +1825,12 @@ function ETicket({ booking, onGoHome, onClose }) {
               </div>
             )}
 
-            {/* Notch divider */}
             <div className="relative py-2">
               <div className="absolute left-[-24px] top-1/2 -translate-y-1/2 w-6 h-6 bg-cinema-dark rounded-full" />
               <div className="absolute right-[-24px] top-1/2 -translate-y-1/2 w-6 h-6 bg-cinema-dark rounded-full" />
               <div className="border-t-2 border-dashed border-zinc-700" />
             </div>
 
-            {/* QR Mock */}
             <div className="text-center py-1">
               <div className="inline-flex p-3 bg-white rounded-2xl mb-2 shadow-inner">
                 <QrCode className="w-24 h-24 text-black" />
@@ -1748,7 +1843,6 @@ function ETicket({ booking, onGoHome, onClose }) {
           </div>
         </div>
 
-        {/* Buttons */}
         <div className="flex gap-3 mt-5">
           <button
             onClick={onGoHome}
@@ -1775,8 +1869,8 @@ function ETicket({ booking, onGoHome, onClose }) {
 // MAIN APP COMPONENT
 // ============================================================
 export default function App() {
-  // Navigation states
-  const [currentView, setCurrentView] = useState('home'); // home | showtime | seats | snacks | checkout
+  // Navigation states: 'home' | 'showtime' | 'seats' | 'snacks' | 'checkout' | 'admin'
+  const [currentView, setCurrentView] = useState('home');
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [showtimeInfo, setShowtimeInfo] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState([]);
@@ -1797,13 +1891,51 @@ export default function App() {
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   const [inspectBooking, setInspectBooking] = useState(null);
 
-  // Persistent States (localStorage)
+  // =========================================================
+  // PERSISTENT DATA STATES (SYNC WITH LOCALSTORAGE)
+  // =========================================================
   const [currentUser, setCurrentUser] = useState(() => {
     try {
-      const saved = localStorage.getItem('cineverse_user');
+      const saved = localStorage.getItem('cineverse_current_user') || localStorage.getItem('cineverse_user');
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
+    }
+  });
+
+  const [moviesList, setMoviesList] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cineverse_movies');
+      return saved ? JSON.parse(saved) : initialMovies;
+    } catch {
+      return initialMovies;
+    }
+  });
+
+  const [showtimesData, setShowtimesData] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cineverse_showtimes');
+      return saved ? JSON.parse(saved) : generateShowtimes();
+    } catch {
+      return generateShowtimes();
+    }
+  });
+
+  const [seatPricesData, setSeatPricesData] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cineverse_seat_prices');
+      return saved ? JSON.parse(saved) : initialSeatPrices;
+    } catch {
+      return initialSeatPrices;
+    }
+  });
+
+  const [snacksList, setSnacksList] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cineverse_snacks');
+      return saved ? JSON.parse(saved) : initialSnacks;
+    } catch {
+      return initialSnacks;
     }
   });
 
@@ -1825,6 +1957,58 @@ export default function App() {
     }
   });
 
+  const [usersList, setUsersList] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cineverse_users');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+      localStorage.setItem('cineverse_users', JSON.stringify(INITIAL_USERS));
+      return INITIAL_USERS;
+    } catch {
+      return INITIAL_USERS;
+    }
+  });
+
+  // Sync users & session to localStorage
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('cineverse_current_user', JSON.stringify(currentUser));
+      localStorage.setItem('cineverse_user', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('cineverse_current_user');
+      localStorage.removeItem('cineverse_user');
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    localStorage.setItem('cineverse_users', JSON.stringify(usersList));
+  }, [usersList]);
+
+  useEffect(() => {
+    localStorage.setItem('cineverse_movies', JSON.stringify(moviesList));
+  }, [moviesList]);
+
+  useEffect(() => {
+    localStorage.setItem('cineverse_showtimes', JSON.stringify(showtimesData));
+  }, [showtimesData]);
+
+  useEffect(() => {
+    localStorage.setItem('cineverse_seat_prices', JSON.stringify(seatPricesData));
+  }, [seatPricesData]);
+
+  useEffect(() => {
+    localStorage.setItem('cineverse_snacks', JSON.stringify(snacksList));
+  }, [snacksList]);
+
+  useEffect(() => {
+    localStorage.setItem('cineverse_favorites', JSON.stringify(favorites));
+  }, [favorites]);
+
+  useEffect(() => {
+    localStorage.setItem('cineverse_bookings', JSON.stringify(userBookings));
+  }, [userBookings]);
+
   // Toasts
   const [toasts, setToasts] = useState([]);
 
@@ -1840,31 +2024,13 @@ export default function App() {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  // Sync to localStorage
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('cineverse_user', JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem('cineverse_user');
-    }
-  }, [currentUser]);
-
-  useEffect(() => {
-    localStorage.setItem('cineverse_favorites', JSON.stringify(favorites));
-  }, [favorites]);
-
-  useEffect(() => {
-    localStorage.setItem('cineverse_bookings', JSON.stringify(userBookings));
-  }, [userBookings]);
-
-  // Favorite toggle helper
   const isFavorite = (movieId) => favorites.includes(movieId);
 
   const toggleFavorite = (movieId) => {
     setFavorites(prev => {
       const exists = prev.includes(movieId);
       const next = exists ? prev.filter(id => id !== movieId) : [...prev, movieId];
-      const movie = movies.find(m => m.id === movieId);
+      const movie = moviesList.find(m => m.id === movieId);
       showToast(
         exists ? `Đã bỏ thích "${movie?.title}"` : `Đã thêm "${movie?.title}" vào danh sách yêu thích ❤️`,
         exists ? 'info' : 'success'
@@ -1875,21 +2041,22 @@ export default function App() {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    if (currentView === 'admin') setCurrentView('home');
     showToast('Đã đăng xuất tài khoản', 'info');
   };
 
   // Filtered movies
   const filteredMovies = useMemo(() => {
-    return movies.filter((movie) => {
+    return moviesList.filter((movie) => {
       const matchSearch =
         movie.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         movie.director.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        movie.cast.some(actor => actor.toLowerCase().includes(searchQuery.toLowerCase()));
-      const matchGenre = selectedGenre === 'Tất cả' || movie.genre.includes(selectedGenre);
-      const matchFormat = selectedFormat === 'Tất cả' || movie.format.includes(selectedFormat);
+        (Array.isArray(movie.cast) ? movie.cast.some(actor => actor.toLowerCase().includes(searchQuery.toLowerCase())) : false);
+      const matchGenre = selectedGenre === 'Tất cả' || (Array.isArray(movie.genre) && movie.genre.includes(selectedGenre));
+      const matchFormat = selectedFormat === 'Tất cả' || (Array.isArray(movie.format) && movie.format.includes(selectedFormat));
       return matchSearch && matchGenre && matchFormat;
     });
-  }, [searchQuery, selectedGenre, selectedFormat]);
+  }, [moviesList, searchQuery, selectedGenre, selectedFormat]);
 
   // Navigation handlers
   const handleBookMovie = (movie) => {
@@ -1920,6 +2087,36 @@ export default function App() {
   const handlePaymentSuccess = (bookingData) => {
     setUserBookings(prev => [bookingData, ...prev]);
     setCurrentBooking(bookingData);
+
+    // Update ticketsCount for current user
+    const bookedSeatsCount = bookingData.selectedSeats?.length || 0;
+    if (currentUser) {
+      setUsersList(prev => {
+        const next = prev.map(u => {
+          if (u.id === currentUser.id || u.email?.toLowerCase() === currentUser.email?.toLowerCase()) {
+            return {
+              ...u,
+              ticketsCount: (u.ticketsCount || 0) + bookedSeatsCount
+            };
+          }
+          return u;
+        });
+        localStorage.setItem('cineverse_users', JSON.stringify(next));
+        return next;
+      });
+
+      setCurrentUser(prev => {
+        if (!prev) return prev;
+        const updated = {
+          ...prev,
+          ticketsCount: (prev.ticketsCount || 0) + bookedSeatsCount
+        };
+        localStorage.setItem('cineverse_current_user', JSON.stringify(updated));
+        localStorage.setItem('cineverse_user', JSON.stringify(updated));
+        return updated;
+      });
+    }
+
     showToast(`Đặt vé thành công! Mã vé: ${bookingData.bookingId}`, 'success');
   };
 
@@ -1934,6 +2131,38 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // =========================================================
+  // RENDER ADMIN DASHBOARD VIEW
+  // =========================================================
+  if (currentView === 'admin') {
+    return (
+      <div className="min-h-screen bg-cinema-darker text-white">
+        <ToastContainer toasts={toasts} removeToast={removeToast} />
+        <AdminDashboard
+          onExitAdmin={goHome}
+          currentUser={currentUser}
+          setCurrentUser={setCurrentUser}
+          moviesList={moviesList}
+          setMoviesList={setMoviesList}
+          showtimesData={showtimesData}
+          setShowtimesData={setShowtimesData}
+          seatPricesData={seatPricesData}
+          setSeatPricesData={setSeatPricesData}
+          bookingsList={userBookings}
+          setBookingsList={setUserBookings}
+          snacksList={snacksList}
+          setSnacksList={setSnacksList}
+          usersList={usersList}
+          setUsersList={setUsersList}
+          showToast={showToast}
+        />
+      </div>
+    );
+  }
+
+  // =========================================================
+  // RENDER CLIENT / USER VIEWS
+  // =========================================================
   return (
     <div className="min-h-screen bg-cinema-dark text-white selection:bg-cinema-red selection:text-white">
       {/* Toast Notification Container */}
@@ -1953,12 +2182,14 @@ export default function App() {
         onOpenFavorites={() => setIsFavoritesOpen(true)}
         favoriteCount={favorites.length}
         bookingCount={userBookings.length}
+        onNavigateAdmin={() => setCurrentView('admin')}
       />
 
       {/* ====== HOME VIEW ====== */}
       {currentView === 'home' && (
         <>
           <HeroBanner
+            moviesList={moviesList}
             onBookNow={handleBookMovie}
             onViewDetail={(movie) => setDetailMovie(movie)}
             onPlayTrailer={(movie) => setTrailerMovie(movie)}
@@ -1998,7 +2229,6 @@ export default function App() {
 
             {/* Filter Pills */}
             <div className="flex flex-col md:flex-row gap-3 mb-8">
-              {/* Genre Pills */}
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                 {allGenres.map((genre) => (
                   <button
@@ -2015,7 +2245,6 @@ export default function App() {
                 ))}
               </div>
 
-              {/* Format Pills */}
               <div className="flex gap-2">
                 {allFormats.map((format) => (
                   <button
@@ -2097,6 +2326,7 @@ export default function App() {
         <ShowtimeSelection
           movie={selectedMovie}
           selectedCity={selectedCity}
+          showtimesData={showtimesData}
           onSelectShowtime={handleSelectShowtime}
           onBack={() => setCurrentView('home')}
         />
@@ -2107,6 +2337,7 @@ export default function App() {
         <SeatSelection
           movie={selectedMovie}
           showtimeInfo={showtimeInfo}
+          seatPricesData={seatPricesData}
           onConfirmSeats={handleConfirmSeats}
           onBack={() => setCurrentView('showtime')}
         />
@@ -2115,9 +2346,10 @@ export default function App() {
       {/* ====== SNACK SELECTION VIEW ====== */}
       {currentView === 'snacks' && (
         <SnackSelection
+          snacksList={snacksList}
           onConfirmSnacks={handleConfirmSnacks}
           onBack={() => setCurrentView('seats')}
-          initialSnacks={snackOrders}
+          initialSnacksOrder={snackOrders}
         />
       )}
 
@@ -2128,6 +2360,7 @@ export default function App() {
           showtimeInfo={showtimeInfo}
           selectedSeats={selectedSeats}
           snackOrders={snackOrders}
+          snacksList={snacksList}
           onPaymentSuccess={handlePaymentSuccess}
           onBack={() => setCurrentView('snacks')}
           showToast={showToast}
@@ -2135,8 +2368,6 @@ export default function App() {
       )}
 
       {/* ====== MODALS ====== */}
-
-      {/* Movie Details Modal */}
       {detailMovie && (
         <MovieDetailModal
           movie={detailMovie}
@@ -2148,7 +2379,6 @@ export default function App() {
         />
       )}
 
-      {/* YouTube Trailer Modal */}
       {trailerMovie && (
         <TrailerModal
           movie={trailerMovie}
@@ -2156,15 +2386,15 @@ export default function App() {
         />
       )}
 
-      {/* Auth Modal (Login / Register) */}
       <AuthModal
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
         onLoginSuccess={(user) => setCurrentUser(user)}
+        usersList={usersList}
+        setUsersList={setUsersList}
         showToast={showToast}
       />
 
-      {/* My Bookings History Modal */}
       <MyBookingsModal
         isOpen={isBookingsOpen}
         onClose={() => setIsBookingsOpen(false)}
@@ -2173,27 +2403,27 @@ export default function App() {
         onBookNewMovie={() => setCurrentView('home')}
       />
 
-      {/* Favorites Modal */}
       <FavoritesModal
         isOpen={isFavoritesOpen}
         onClose={() => setIsFavoritesOpen(false)}
         favoriteIds={favorites}
+        moviesList={moviesList}
         onBookMovie={handleBookMovie}
         onToggleFavorite={toggleFavorite}
       />
 
-      {/* E-Ticket Modal after immediate booking */}
       {currentBooking && (
         <ETicket
           booking={currentBooking}
+          snacksList={snacksList}
           onGoHome={goHome}
         />
       )}
 
-      {/* E-Ticket inspection from My Bookings history */}
       {inspectBooking && !currentBooking && (
         <ETicket
           booking={inspectBooking}
+          snacksList={snacksList}
           onGoHome={goHome}
           onClose={() => setInspectBooking(null)}
         />

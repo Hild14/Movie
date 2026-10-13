@@ -1,6 +1,6 @@
 // Mock data for Movie Booking Application
 
-export const movies = [
+export const initialMovies = [
   {
     id: 1,
     title: 'Lật Mặt 8: Vòng Xoáy Tử Thần',
@@ -117,6 +117,8 @@ export const movies = [
   },
 ];
 
+export const movies = initialMovies;
+
 export const cities = ['Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng', 'Cần Thơ', 'Hải Phòng'];
 
 export const theaters = [
@@ -178,7 +180,7 @@ export const theaters = [
 ];
 
 // Generate showtimes for 7 days starting from 2026-10-12
-const generateShowtimes = () => {
+export const generateShowtimes = () => {
   const showtimes = {};
   const baseDate = new Date('2026-10-12');
   const timeSlots = ['09:30', '11:45', '14:00', '16:30', '19:00', '21:15'];
@@ -195,7 +197,7 @@ const generateShowtimes = () => {
 
 export const showtimes = generateShowtimes();
 
-export const snacks = [
+export const initialSnacks = [
   {
     id: 1,
     name: 'Combo Solo',
@@ -240,11 +242,15 @@ export const snacks = [
   },
 ];
 
-export const seatPrices = {
+export const snacks = initialSnacks;
+
+export const initialSeatPrices = {
   standard: 90000,
   vip: 120000,
   sweetbox: 160000,
 };
+
+export const seatPrices = initialSeatPrices;
 
 export const paymentMethods = [
   {
@@ -278,3 +284,64 @@ export const paymentMethods = [
     color: '#ff6f00',
   },
 ];
+
+// Initial Users according to requirements
+export const INITIAL_USERS = [
+  {
+    id: 'admin1',
+    name: 'Quản trị viên CineVerse',
+    email: 'admin@cineverse.com',
+    password: 'admin',
+    role: 'admin',
+    createdAt: '2026-01-01',
+    status: 'active',
+    ticketsCount: 15,
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+  },
+  {
+    id: 'user_1',
+    name: 'Nguyễn Văn A',
+    email: 'nguyenvana@gmail.com',
+    password: '123',
+    role: 'user',
+    createdAt: '2026-03-12',
+    status: 'active',
+    ticketsCount: 4,
+    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
+  },
+  {
+    id: 'user_2',
+    name: 'Trần Thị Thuỷ',
+    email: 'thuy.tran@yahoo.com',
+    password: '123',
+    role: 'user',
+    createdAt: '2026-05-18',
+    status: 'active',
+    ticketsCount: 2,
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80',
+  },
+  {
+    id: 'user_3',
+    name: 'Lê Hoàng Nam',
+    email: 'nam.le@gmail.com',
+    password: '123',
+    role: 'user',
+    createdAt: '2026-07-22',
+    status: 'active',
+    ticketsCount: 6,
+    avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=120&q=80',
+  },
+  {
+    id: 'user_4',
+    name: 'Phạm Minh Đức',
+    email: 'duc.pham@outlook.com',
+    password: '123',
+    role: 'user',
+    createdAt: '2026-09-05',
+    status: 'locked',
+    ticketsCount: 0,
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80',
+  }
+];
+
+export const initialUsers = INITIAL_USERS;
